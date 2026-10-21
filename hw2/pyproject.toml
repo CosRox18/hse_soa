@@ -1,0 +1,23 @@
+[tool.datamodel-codegen]
+input = "openapi/marketplace.yaml"
+input-file-type = "openapi"
+output = "app/generated/models.py"
+output-model-type = "pydantic_v2.BaseModel"
+base-class = "app.schema.ContractModel"
+target-python-version = "3.13"
+use-standard-collections = true
+use-union-operator = true
+field-constraints = true
+use-decimal-for-multiple-of = true
+strict-types = ["str", "int", "bool"]
+strict-nullable = true
+disable-timestamp = true
+extra-fields = "forbid"
+formatters = ["builtin"]
+openapi-scopes = ["schemas", "api"]
+generate-server = "fastapi"
+server-output = "app/generated/server"
+server-package = "app.generated.server"
+server-model-package = "app.generated.models"
+server-include-request = true
+server-layout = "single"
