@@ -1,0 +1,73 @@
+syntax = "proto3";
+package flights;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+service FlightService {
+  // INVALID_ARGUMENT; все методы требуют metadata x-api-key, иначе UNAUTHENTICATED.
+  rpc SearchFlights(SearchFlightsRequest) returns (SearchFlightsResponse);
+  // NOT_FOUND, INVALID_ARGUMENT.
+  rpc GetFlight(GetFlightRequest) returns (Flight);
+  // NOT_FOUND, INVALID_ARGUMENT, RESOURCE_EXHAUSTED, FAILED_PRECONDITION.
+  rpc ReserveSeats(ReserveSeatsRequest) returns (SeatReservation);
+  // INVALID_ARGUMENT. Повторный вызов не возвращает места дважды.
+  rpc ReleaseReservation(ReleaseReservationRequest) returns (google.protobuf.Empty);
+  // NOT_FOUND, INVALID_ARGUMENT. Изменение цены/статуса инвалидирует кеш.
+  rpc UpdateFlight(UpdateFlightRequest) returns (Flight);
+}
+
+enum FlightStatus {
+  FLIGHT_STATUS_UNSPECIFIED = 0;
+  SCHEDULED = 1;
+  DEPARTED = 2;
+  CANCELLED = 3;
+  COMPLETED = 4;
+}
+
+enum ReservationStatus {
+  RESERVATION_STATUS_UNSPECIFIED = 0;
+  ACTIVE = 1;
+  RELEASED = 2;
+  EXPIRED = 3;
+}
+
+message Flight {
+  int64 id = 1;
+  string flight_number = 2;
+  string airline_code = 3;
+  string airline_name = 4;
+  string origin = 5;
+  string destination = 6;
+  google.protobuf.Timestamp departure_at = 7;
+  google.protobuf.Timestamp arrival_at = 8;
+  int32 total_seats = 9;
+  int32 available_seats = 10;
+  string price = 11;
+  FlightStatus status = 12;
+}
+
+message SearchFlightsRequest {
+  string origin = 1;
+  string destination = 2;
+  google.protobuf.Timestamp date = 3;
+}
+message SearchFlightsResponse { repeated Flight flights = 1; }
+message GetFlightRequest { int64 id = 1; }
+message ReserveSeatsRequest {
+  int64 flight_id = 1;
+  int32 seat_count = 2;
+  string booking_id = 3;
+}
+message SeatReservation {
+  string booking_id = 1;
+  int64 flight_id = 2;
+  int32 seat_count = 3;
+  ReservationStatus status = 4;
+}
+message ReleaseReservationRequest { string booking_id = 1; }
+message UpdateFlightRequest {
+  int64 id = 1;
+  optional string price = 2;
+  optional FlightStatus status = 3;
+}
