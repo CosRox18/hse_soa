@@ -1,0 +1,44 @@
+@startuml
+title Вариант 2 — таймаут push и доставка через SMS
+hide footbox
+autonumber
+participant "Temporal Service" as Temporal
+participant "Workflow / Activity Worker" as Worker
+database "Прикладная PostgreSQL" as DB
+participant "SMS-провайдер" as SMS
+participant "Notification API" as API
+participant "Outbox relay" as Relay
+actor "Приложение" as App
+
+note over Temporal, Worker: Push уже отправлен; ACK не пришёл
+... durable timer t=2 с ...
+Temporal -> Worker: Продолжить workflow после timer
+Worker -> DB: Проверить DELIVERED и receipt (Activity)
+DB --> Worker: Доставка не подтверждена
+Worker -> Temporal: Результат сверки
+Temporal -> Worker: Workflow Task с результатом сверки
+Worker -> Temporal: Команды timer t=20 с и Activity SMS
+Temporal -> Temporal: Сохранить timer t=20 с
+Temporal -> Worker: Activity отправки SMS
+Worker -> DB: Проверить DELIVERED и настройки, записать попытку
+Worker -> SMS: Отправить с ID попытки, timeout ≤500 мс
+SMS --> Worker: ACCEPTED, provider_id
+Worker -> DB: Сохранить результат попытки
+Worker -> Temporal: Результат Activity
+Temporal -> Worker: Workflow Task с результатом Activity
+Worker -> Temporal: Ждать receipt, timer уже запущен
+SMS -> API: Подписанный DELIVERED receipt с ID попытки
+API -> DB: Receipt + DELIVERED + outbox Signal; COMMIT
+API --> SMS: 200
+Relay -> Temporal: Signal(DELIVERED, callback_id)
+Temporal -> Temporal: Сохранить Signal
+Temporal -> Worker: Workflow Task с receipt
+Worker -> Temporal: Команды отмены timer и завершения workflow
+opt Поздний push ACK
+    App -> API: ACK(notification_id, attempt_id)
+    API -> DB: Сохранить callback
+    note over API, DB: Второе подтверждение учтено; завершённый workflow не запускаем
+end
+note over Temporal, Worker: Без SMS receipt к t=20 с запускаем email.
+note over Temporal, DB: В t=60 с — ESCALATED, алерт; workflow продолжает повторы.
+@enduml

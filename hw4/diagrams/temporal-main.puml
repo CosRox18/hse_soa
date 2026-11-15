@@ -1,0 +1,44 @@
+@startuml
+title Вариант 2 — основная доставка через push
+hide footbox
+autonumber
+participant "Сервис банка" as Bank
+participant "Notification API" as API
+database "Прикладная PostgreSQL" as DB
+participant "Relay / Starter" as Relay
+queue RabbitMQ as MQ
+participant "Temporal Service" as Temporal
+participant "Workflow / Activity Worker" as Worker
+participant "Push-провайдер" as Push
+actor "Приложение" as App
+
+Bank -> API: Событие, recipient_id, ключ повтора
+API -> DB: Ключ + notification со сроками + outbox; COMMIT
+API --> Bank: 202, notification_id
+Relay -> MQ: ID задания, с confirm
+MQ -> Relay: Критичное задание
+Relay -> Temporal: Start Workflow(id = notification_id, REJECT_DUPLICATE)
+Temporal -> Temporal: Сохранить старт в истории
+Temporal --> Relay: Workflow запущен / уже существует
+Relay -> MQ: ACK
+Worker -> Temporal: Poll task queue
+Temporal --> Worker: Начальная Workflow Task
+Worker -> Temporal: Команды timer t=2 с и Activity push
+Temporal -> Temporal: Сохранить timer в истории
+Temporal -> Worker: Activity отправки push
+Worker -> DB: Проверить DELIVERED и настройки, записать попытку
+Worker -> Push: Отправить с ID попытки, timeout ≤500 мс
+Push --> Worker: ACCEPTED, provider_id
+Worker -> DB: Сохранить результат попытки
+Worker -> Temporal: Результат Activity
+Temporal -> Worker: Workflow Task с результатом Activity
+Worker -> Temporal: Ждать ACK, timer уже запущен
+Push -> App: notification_id, attempt_id
+App -> API: Авторизованный ACK с ID попытки
+API -> DB: Receipt + DELIVERED + outbox Signal; COMMIT
+API --> App: 200
+Relay -> Temporal: Signal(ACK, callback_id)
+Temporal -> Temporal: Сохранить Signal
+Temporal -> Worker: Workflow Task с ACK
+Worker -> Temporal: Команды отмены timer и завершения workflow
+@enduml

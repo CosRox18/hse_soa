@@ -1,0 +1,38 @@
+@startuml
+!include <C4/C4_Container>
+LAYOUT_TOP_DOWN()
+title Вариант 2 — Temporal для критичной доставки, C4 Container
+
+Person(client, "Клиент / поддержка", "Настройки, ACK приложения, статус")
+System_Ext(bank, "Сервисы банка", "Бизнес-события и исходящий outbox")
+System_Ext(providers, "Провайдеры каналов", "FCM/APNs, SMS API, email API")
+System_Ext(monitoring, "Наблюдаемость", "Prometheus, Grafana, Loki, Tempo")
+
+System_Boundary(platform, "Notification Platform") {
+    Container(api, "Notification API", "Python / FastAPI", "Приём, настройки, callback и фиксация доставки")
+    Container(relay, "Outbox relay / Starter", "Python", "Публикация, запуск workflow и повтор Signal")
+    ContainerQueue(broker, "Очереди по типам", "RabbitMQ / quorum queues", "Критичные отдельно от сервисных и маркетинга")
+    Container(temporal, "Temporal Service", "Temporal / 3 зоны", "История workflow, таймеры и task queues")
+    Container(workers, "Workflow / Activity Workers", "Python / Temporal SDK", "Маршрут критичных сообщений и адаптеры")
+    Container(bulk, "Обработчики остальных типов", "Python", "Сервисные сообщения и маркетинг")
+    ContainerDb(db, "Прикладные данные", "PostgreSQL / 3 зоны", "Настройки, ключи повторов, попытки, факт доставки, outbox")
+    ContainerDb(history, "История Temporal", "Отдельная PostgreSQL / 3 зоны", "Состояние выполнения и таймеры")
+}
+
+Rel(bank, api, "Событие + ключ повтора", "HTTPS / JSON")
+Rel(client, api, "Настройки, статусы, ACK", "HTTPS / JSON")
+Rel(api, db, "Задание + outbox; receipt + DELIVERED + Signal outbox", "SQL / TLS")
+Rel(relay, db, "Читает outbox", "SQL / TLS")
+Rel(relay, broker, "Публикует и получает критичные задания", "AMQP / TLS, confirm / ACK")
+Rel(broker, bulk, "Сервисные и маркетинговые задания", "AMQP / TLS")
+Rel(bulk, db, "Настройки, попытки и статусы", "SQL / TLS")
+Rel(bulk, providers, "Отправка", "HTTPS / JSON")
+Rel(relay, temporal, "Start Workflow / Signal по ID", "gRPC / TLS")
+Rel(workers, temporal, "Получает задачи, возвращает результаты", "gRPC / TLS")
+Rel(temporal, history, "Сохраняет историю", "SQL / TLS")
+Rel(workers, db, "Проверяет доставку, сохраняет попытки", "SQL / TLS")
+Rel(workers, providers, "Отправка и сверка, ключ попытки", "HTTPS / JSON")
+Rel(providers, api, "Подписанный receipt", "HTTPS / JSON")
+Rel(providers, client, "Push / SMS / email")
+Rel(workers, monitoring, "Метрики, логи без содержимого, трассы", "TLS")
+@enduml

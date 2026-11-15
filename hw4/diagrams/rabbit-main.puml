@@ -1,0 +1,34 @@
+@startuml
+title Вариант 1 — основная доставка через push
+hide footbox
+autonumber
+participant "Сервис банка" as Bank
+participant "Notification API" as API
+database PostgreSQL as DB
+participant "Outbox relay" as Relay
+queue RabbitMQ as MQ
+participant "Работник" as Worker
+participant "Push-провайдер" as Push
+actor "Приложение клиента" as App
+
+Bank -> API: Событие, recipient_id, ключ повтора
+API -> DB: Ключ + notification со сроками + outbox; COMMIT
+API --> Bank: 202, notification_id
+Relay -> DB: Получить outbox
+Relay -> MQ: notification_id + step_version, mandatory
+MQ --> Relay: Publisher confirm
+Relay -> DB: Отметить публикацию
+MQ -> Worker: Задание с версией шага
+Worker -> DB: Проверка DELIVERED; lease до 1 с; попытка push и срок t=2 с; COMMIT
+Worker -> Push: Отправить с ID попытки, timeout ≤500 мс
+Push --> Worker: ACCEPTED, provider_id
+Worker -> DB: Сохранить результат; снять lease
+Worker -> MQ: ACK после сохранения
+Push -> App: notification_id, attempt_id
+App -> API: Авторизованный ACK с ID попытки
+API -> DB: Receipt + DELIVERED; отменить будущие шаги; COMMIT
+API --> App: 200
+Bank -> API: GET status
+API -> DB: Прочитать notification
+API --> Bank: DELIVERED, канал push
+@enduml

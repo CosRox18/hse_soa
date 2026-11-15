@@ -1,0 +1,33 @@
+@startuml
+title Вариант 1 — таймаут push и доставка через SMS
+hide footbox
+autonumber
+participant "Работник / планировщик" as Worker
+database PostgreSQL as DB
+participant "Relay + RabbitMQ" as Queue
+participant "SMS-провайдер" as SMS
+participant "Notification API" as API
+actor "Приложение" as App
+
+note over Worker, DB: Push принят, ACK нет; lease снята; срок t=2 с сохранён
+... наступил t=2 с ...
+Worker -> DB: Захватить строку; проверить DELIVERED и receipt
+DB --> Worker: PENDING, подтверждения нет
+Worker -> DB: Создать SMS-шаг, срок t=20 с и outbox; COMMIT
+Queue -> Worker: Задание SMS
+Worker -> DB: Проверка доставки; lease до 1 с; настройки и ID попытки
+Worker -> SMS: Отправить с ID попытки, timeout ≤500 мс
+SMS --> Worker: ACCEPTED, provider_id
+Worker -> DB: Сохранить результат; снять lease
+Worker -> Queue: ACK
+SMS -> API: Подписанный DELIVERED receipt с ID попытки
+API -> DB: Receipt + DELIVERED; отменить будущие шаги; COMMIT
+API --> SMS: 200
+opt Поздний push ACK
+    App -> API: ACK(notification_id, attempt_id)
+    API -> DB: Сохранить подтверждение push
+    note over Worker, DB: Новых отправок нет; два receipt учитываем как возможный дубль
+end
+note over Worker, SMS: Без SMS receipt к t=20 с запускаем email.
+note over Worker, DB: Без подтверждения к t=60 с — ESCALATED, алерт, дальнейшие повторы.
+@enduml

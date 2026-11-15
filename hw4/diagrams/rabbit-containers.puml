@@ -1,0 +1,31 @@
+@startuml
+!include <C4/C4_Container>
+LAYOUT_TOP_DOWN()
+title Вариант 1 — PostgreSQL и RabbitMQ, C4 Container
+
+Person(client, "Клиент / поддержка", "Настройки, ACK приложения, статус")
+System_Ext(bank, "Сервисы банка", "Бизнес-события и исходящий outbox")
+System_Ext(providers, "Провайдеры каналов", "FCM/APNs, SMS API, email API")
+System_Ext(monitoring, "Наблюдаемость", "Prometheus, Grafana, Loki, Tempo")
+
+System_Boundary(platform, "Notification Platform") {
+    Container(api, "Notification API", "Python / FastAPI", "Приём, настройки, callback и фиксация доставки")
+    Container(relay, "Outbox relay", "Python", "Повторяет публикацию до confirm")
+    ContainerQueue(broker, "Очереди по типам", "RabbitMQ / quorum queues", "Критичные, сервисные, маркетинг; 3 узла")
+    Container(workers, "Обработчики доставки", "Python", "Отдельные пулы; маршрутизация, таймеры, адаптеры")
+    ContainerDb(db, "Данные платформы", "PostgreSQL / 3 зоны", "Уведомления, настройки, попытки, callback, outbox, сроки")
+}
+
+Rel(bank, api, "Событие + ключ повтора", "HTTPS / JSON")
+Rel(client, api, "Настройки, статусы, ACK", "HTTPS / JSON")
+Rel(api, db, "Задание + outbox; receipt + DELIVERED", "SQL / TLS")
+Rel(relay, db, "Читает outbox, отмечает confirm", "SQL / TLS")
+Rel(relay, broker, "ID уведомления и версия шага", "AMQP / TLS, confirm")
+Rel(broker, workers, "Доставка задания, ручной ACK", "AMQP / TLS")
+Rel(workers, db, "Захват, состояние, сроки и новый outbox", "SQL / TLS")
+Rel(workers, providers, "Отправка и сверка, ключ попытки", "HTTPS / JSON")
+Rel(providers, api, "Подписанный receipt", "HTTPS / JSON")
+Rel(providers, client, "Push / SMS / email")
+Rel(workers, monitoring, "Метрики, логи без содержимого, трассы", "TLS")
+Rel(api, monitoring, "Метрики приёма и трассы", "TLS")
+@enduml
