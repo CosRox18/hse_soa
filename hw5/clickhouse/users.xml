@@ -1,0 +1,16 @@
+<clickhouse>
+    <profiles>
+        <grafana>
+            <readonly>2</readonly>
+            <max_execution_time>30</max_execution_time>
+        </grafana>
+    </profiles>
+    <users>
+        <grafana>
+            <password>grafana-dev</password>
+            <networks><ip>::/0</ip></networks>
+            <profile>grafana</profile>
+            <quota>default</quota>
+        </grafana>
+    </users>
+</clickhouse>

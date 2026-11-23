@@ -1,0 +1,20 @@
+<clickhouse>
+    <max_server_memory_usage>1073741824</max_server_memory_usage>
+    <mark_cache_size>67108864</mark_cache_size>
+    <uncompressed_cache_size>16777216</uncompressed_cache_size>
+    <background_schedule_pool_size>32</background_schedule_pool_size>
+    <background_message_broker_schedule_pool_size>8</background_message_broker_schedule_pool_size>
+    <logger>
+        <level>warning</level>
+        <size>10M</size>
+        <count>1</count>
+    </logger>
+    <query_log remove="1"/>
+    <query_thread_log remove="1"/>
+    <part_log remove="1"/>
+    <metric_log remove="1"/>
+    <asynchronous_metric_log remove="1"/>
+    <trace_log remove="1"/>
+    <processors_profile_log remove="1"/>
+    <text_log remove="1"/>
+</clickhouse>

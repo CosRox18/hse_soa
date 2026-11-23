@@ -1,0 +1,169 @@
+{
+  "uid": "cinema",
+  "title": "Online Cinema",
+  "schemaVersion": 41,
+  "version": 1,
+  "timezone": "utc",
+  "refresh": "10s",
+  "time": {
+    "from": "now-8d",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "id": 1,
+      "title": "Retention Cohort Heatmap — первый просмотр, завершённый день",
+      "type": "table",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 11
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "queryType": "sql",
+          "format": 1,
+          "rawSql": "SELECT toString(item.1) AS cohort,\nmaxIf(item.3, item.2 = 0) AS `Day 0`,\nmaxIf(item.3, item.2 = 1) AS `Day 1`,\nmaxIf(item.3, item.2 = 2) AS `Day 2`,\nmaxIf(item.3, item.2 = 3) AS `Day 3`,\nmaxIf(item.3, item.2 = 4) AS `Day 4`,\nmaxIf(item.3, item.2 = 5) AS `Day 5`,\nmaxIf(item.3, item.2 = 6) AS `Day 6`,\nmaxIf(item.3, item.2 = 7) AS `Day 7`\nFROM analytics.daily_metrics FINAL\nARRAY JOIN cohorts AS item\nWHERE day = (SELECT max(day) FROM analytics.daily_metrics WHERE day < today())\nGROUP BY cohort ORDER BY cohort"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "md"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "decimals": 1,
+          "color": {
+            "mode": "continuous-RdYlGr"
+          },
+          "custom": {
+            "cellOptions": {
+              "type": "color-background",
+              "mode": "basic"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cohort"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Когорта"
+              },
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "id": 2,
+      "title": "DAU",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 11,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "queryType": "sql",
+          "format": 0,
+          "rawSql": "SELECT toDateTime(day) AS time, dau FROM analytics.daily_metrics FINAL WHERE day >= today() - 8 ORDER BY time"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "id": 3,
+      "title": "Конверсия VIEW_FINISHED / VIEW_STARTED",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 11,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "editorType": "sql",
+          "queryType": "sql",
+          "format": 0,
+          "rawSql": "SELECT toDateTime(day) AS time, conversion FROM analytics.daily_metrics FINAL WHERE day >= today() - 8 ORDER BY time"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    }
+  ]
+}
